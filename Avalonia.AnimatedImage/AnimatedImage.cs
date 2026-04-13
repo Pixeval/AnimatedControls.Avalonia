@@ -21,6 +21,8 @@ public class AnimatedImage : Control
     public static readonly StyledProperty<StretchDirection> StretchDirectionProperty = AvaloniaProperty.Register<AnimatedImage, StretchDirection>(nameof(StretchDirection), StretchDirection.Both);
 
     public static readonly StyledProperty<Stretch> StretchProperty = AvaloniaProperty.Register<AnimatedImage, Stretch>(nameof(Stretch), Stretch.UniformToFill);
+    
+    public static readonly StyledProperty<bool> IsPlayingProperty = AvaloniaProperty.Register<AnimatedImage, bool>(nameof(IsPlaying), true);
 
     [Content]
     public IAnimatedBitmap? Source
@@ -41,6 +43,12 @@ public class AnimatedImage : Control
         set => SetValue(StretchProperty, value);
     }
 
+    public bool IsPlaying
+    {
+        get => GetValue(IsPlayingProperty); 
+        set => SetValue(IsPlayingProperty, value);
+    }
+
     static AnimatedImage()
     {
         AffectsMeasure<AnimatedImage>(SourceProperty, StretchProperty, StretchDirectionProperty);
@@ -53,6 +61,11 @@ public class AnimatedImage : Control
         {
             case nameof(Source):
                 OnSourcePropertyChanged(change.NewValue as IAnimatedBitmap);
+                break;
+            case nameof(IsPlaying):
+                _customVisual?.SendHandlerMessage(IsPlaying
+                    ? CustomVisualHandler.StartMessage
+                    : CustomVisualHandler.StopMessage);
                 break;
             case nameof(Stretch):
                 _customVisual?.SendHandlerMessage(Stretch);
@@ -144,7 +157,9 @@ public class AnimatedImage : Control
         var customVisual = compositor.CreateCustomVisual(new CustomVisualHandler());
         _customVisual = customVisual;
         ElementComposition.SetElementChildVisual(this, customVisual);
-        customVisual.SendHandlerMessage(CustomVisualHandler.StartMessage);
+        customVisual.SendHandlerMessage(IsPlaying
+            ? CustomVisualHandler.StartMessage
+            : CustomVisualHandler.StopMessage);
 
         if (Source is { IsInitialized: false, IsFailed: false } source)
             await InitSourceAsync(source);
