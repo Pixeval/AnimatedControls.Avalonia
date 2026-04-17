@@ -22,13 +22,13 @@ public class AnimatedImage : Control
     public static readonly StyledProperty<StretchDirection> StretchDirectionProperty = AvaloniaProperty.Register<AnimatedImage, StretchDirection>(nameof(StretchDirection), StretchDirection.Both);
 
     public static readonly StyledProperty<Stretch> StretchProperty = AvaloniaProperty.Register<AnimatedImage, Stretch>(nameof(Stretch), Stretch.UniformToFill);
-    
+
     public static readonly StyledProperty<bool> IsPlayingProperty = AvaloniaProperty.Register<AnimatedImage, bool>(nameof(IsPlaying), true);
 
     [Content]
     public IAnimatedBitmap? Source
     {
-        get => GetValue(SourceProperty); 
+        get => GetValue(SourceProperty);
         set => SetValue(SourceProperty, value);
     }
 
@@ -40,13 +40,13 @@ public class AnimatedImage : Control
 
     public Stretch Stretch
     {
-        get => GetValue(StretchProperty); 
+        get => GetValue(StretchProperty);
         set => SetValue(StretchProperty, value);
     }
 
     public bool IsPlaying
     {
-        get => GetValue(IsPlayingProperty); 
+        get => GetValue(IsPlayingProperty);
         set => SetValue(IsPlayingProperty, value);
     }
 
@@ -83,7 +83,7 @@ public class AnimatedImage : Control
 
         base.OnPropertyChanged(change);
     }
-    
+
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
@@ -121,17 +121,32 @@ public class AnimatedImage : Control
 
     private async void OnSourcePropertyChanged(IAnimatedBitmap? newValue)
     {
-        if (_customVisual is null)
+        var customVisual = _customVisual;
+        if (customVisual is null)
             return;
 
         if (newValue is null)
-            _customVisual.SendHandlerMessage(CustomVisualHandler.ResetMessage);
+            customVisual.SendHandlerMessage(CustomVisualHandler.ResetMessage);
         else
         {
             if (Source is { IsInitialized: false, IsFailed: false } source)
-                await InitSourceAsync(source);
+            {
+                try
+                {
+                    await InitSourceAsync(source);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to initialize animated image source: {ex}");
+                    return;
+                }
+            }
+
+            if (VisualRoot is null || !ReferenceEquals(_customVisual, customVisual))
+                return;
+
             if (Source is { IsInitialized: true })
-                _customVisual.SendHandlerMessage(newValue);
+                customVisual.SendHandlerMessage(newValue);
         }
 
         InvalidateArrange();
@@ -143,7 +158,7 @@ public class AnimatedImage : Control
     {
         if (_customVisual is null)
             return;
-        
+
         _customVisual.Size = new Vector2((float) Bounds.Width, (float) Bounds.Height);
         _customVisual.Offset = Vector3.Zero;
     }
@@ -162,13 +177,23 @@ public class AnimatedImage : Control
             ? CustomVisualHandler.StartMessage
             : CustomVisualHandler.StopMessage);
 
-        if (Source is { IsInitialized: false, IsFailed: false } source)
+        if (VisualRoot is null || version != _visualTreeVersion || !ReferenceEquals(_customVisual, customVisual))
+            return;
+
+        customVisual.SendHandlerMessage(Stretch);
+        customVisual.SendHandlerMessage(StretchDirection);
+
+        var source = Source;
+        if (source is { IsInitialized: false, IsFailed: false })
+        {
             await InitSourceAsync(source);
 
-        _customVisual.SendHandlerMessage(Stretch);
-        _customVisual.SendHandlerMessage(StretchDirection);
-        if (Source is { IsInitialized: true })
-            _customVisual.SendHandlerMessage(Source);
+            if (VisualRoot is null || version != _visualTreeVersion || !ReferenceEquals(_customVisual, customVisual))
+                return;
+        }
+
+        if (ReferenceEquals(Source, source) && Source is { IsInitialized: true })
+            customVisual.SendHandlerMessage(Source);
 
         InvalidateArrange();
         InvalidateMeasure();
@@ -177,19 +202,20 @@ public class AnimatedImage : Control
 
     private async Task InitSourceAsync(IAnimatedBitmap source)
     {
-        if (source.IsCancellable)
-        {
-            await Task.Run(source.Init);
-            return;
-        }
-
         if (_cancellationTokenSource is not null)
         {
             await _cancellationTokenSource.CancelAsync();
             _cancellationTokenSource.Dispose();
         }
 
+        if (!source.IsCancellable)
+        {
+            await Task.Run(source.Init);
+            return;
+        }
+
         _cancellationTokenSource = new();
+
         try
         {
             await Task.Run(source.Init, _cancellationTokenSource.Token);
@@ -204,7 +230,7 @@ public class AnimatedImage : Control
     {
         _cancellationTokenSource?.Cancel();
         _cancellationTokenSource?.Dispose();
-    } 
+    }
 
     private class CustomVisualHandler : CompositionCustomVisualHandler
     {
@@ -242,22 +268,22 @@ public class AnimatedImage : Control
                     _stretchDirection = sd;
                     break;
                 case IAnimatedBitmap { IsInitialized: true } instance:
-                {
-                    Clear();
-                    if (instance.Delays.Count != instance.FrameCount)
-                        throw new ArgumentException(
-                            $"{nameof(instance.Delays)} inconsistent count with {nameof(instance.Frames)}");
-                    _currentInstance = instance;
-                    foreach (var delay in instance.Delays)
                     {
-                        _frameTimes.Add(_totalTime);
-                        _totalTime += delay;
+                        Clear();
+                        if (instance.Delays.Count != instance.FrameCount)
+                            throw new ArgumentException(
+                                $"{nameof(instance.Delays)} inconsistent count with {nameof(instance.FrameCount)}");
+                        _currentInstance = instance;
+                        foreach (var delay in instance.Delays)
+                        {
+                            _frameTimes.Add(_totalTime);
+                            _totalTime += delay;
+                        }
+
+                        Invalidate();
+
+                        break;
                     }
-
-                    Invalidate();
-
-                    break;
-                }
             }
             return;
 

@@ -15,7 +15,7 @@ internal class AnimatedBitmapSimpleImpl : IAnimatedBitmap
         if (bitmaps.Count is var bitmapCount && delays.Count != bitmapCount)
             throw new ArgumentException($"{nameof(delays)} inconsistent count with {nameof(bitmaps)}");
         if ((IReadOnlyList<Bitmap>) [.. bitmaps] is not [var first, ..] bitmapsCopy)
-            throw new ArgumentException($"Invalid {nameof(delays)}.Count");
+            throw new ArgumentException($"Invalid {nameof(bitmaps)}.Count");
         Size = first.Size;
         Frames = bitmapsCopy;
         Delays = [.. delays];
@@ -27,8 +27,6 @@ internal class AnimatedBitmapSimpleImpl : IAnimatedBitmap
     public bool IsFailed => false;
 
     public bool IsCancellable { get; set; }
-
-    public bool IsDisposed { get; set; }
 
     public Size Size { get; }
 
@@ -42,6 +40,17 @@ internal class AnimatedBitmapSimpleImpl : IAnimatedBitmap
     public event EventHandler? Initialized;
 
     public event EventHandler<AnimatedBitmapFailedEventArgs>? Failed;
+
+    public void Dispose()
+    {
+        var initialized = IsInitialized;
+        IsInitialized = false;
+        GC.SuppressFinalize(this);
+
+        if (initialized)
+            foreach (var bitmap in Frames)
+                bitmap.Dispose();
+    }
 
     public void Init()
     {
