@@ -1,4 +1,4 @@
-<Window
+﻿<Window
     x:Class="AnimatedControls.Avalonia.Sample.MainWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -7,9 +7,9 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:sample="clr-namespace:AnimatedControls.Avalonia.Sample"
     Title="AnimatedControls.Avalonia.Sample"
+    mc:Ignorable="d"
     d:DesignHeight="450"
-    d:DesignWidth="800"
-    mc:Ignorable="d">
+    d:DesignWidth="800">
 
     <DockPanel Margin="5" VerticalSpacing="5">
         <DockPanel DockPanel.Dock="Top" HorizontalSpacing="5">
