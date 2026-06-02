@@ -1,108 +1,104 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Avalonia;
 using Avalonia.Media.Imaging;
 
 namespace AnimatedControls.Avalonia;
 
-internal class MultiAnimatedBitmap(IReadOnlyCollection<Stream> frameStreams, IReadOnlyCollection<int> delays, bool disposeStream) : IAnimatedBitmap
+internal class MultiAnimatedBitmap(IReadOnlyCollection<Stream> frameStreams, IReadOnlyCollection<int> delays, bool disposeStream) : AnimatedBitmapBase
 {
-    public bool IsInitialized { get => !IsFailed && field; set; }
-
-    public bool IsFailed { get; private set; }
-
-    public bool IsCancellable { get; set; }
-
-    public Size Size { get; private set; }
-    
-    public int FrameCount { get; private set; }
-
-    [field: MaybeNull, AllowNull]
-    public IReadOnlyList<Bitmap> Frames
-    {
-        get => field ?? throw new InvalidOperationException();
-        private set;
-    }
-
-    public IReadOnlyList<int> Delays { get; private set; } = [];
-
-    public event EventHandler? Initialized;
-    
-    public event EventHandler<AnimatedBitmapFailedEventArgs>? Failed;
-
-    private List<Stream>? _frameStreams =
+    private List<Stream?>? _frameStreams =
         (frameStreams ?? throw new ArgumentNullException(nameof(frameStreams))).Count < 1
             ? throw new ArgumentException($"Invalid {nameof(frameStreams)}.Count")
             : [..frameStreams];
 
-    private readonly IReadOnlyCollection<int> _delays =
-        (IReadOnlyCollection<int>) [..delays] ?? throw new ArgumentNullException(nameof(delays));
+    private readonly IReadOnlyCollection<int> _sourceDelays =
+        delays is not null ? [..delays] : throw new ArgumentNullException(nameof(delays));
 
-    public void Dispose()
+    private Size _size;
+    private int _frameCount;
+    private IReadOnlyList<Bitmap>? _frames;
+    private IReadOnlyList<int> _delays = [];
+
+    public override Size Size => _size;
+    
+    public override int FrameCount => _frameCount;
+
+    public override IReadOnlyList<Bitmap> Frames => _frames ?? throw new InvalidOperationException();
+
+    public override IReadOnlyList<int> Delays => _delays;
+
+    protected override void InitCore(CancellationToken cancellationToken)
     {
-        var initialized = IsInitialized;
-        IsInitialized = false;
-        GC.SuppressFinalize(this);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        if (_frameStreams is not null && disposeStream)
-            foreach (var frameStream in _frameStreams)
-                frameStream.Dispose();
-        _frameStreams = null;
+        var frameStreams = _frameStreams
+            ?? throw new InvalidOperationException($"{nameof(MultiAnimatedBitmap)} has no readable frame streams.");
 
-        if (initialized)
-            foreach (var bitmap in Frames)
-                bitmap.Dispose();
-    }
+        var delays = new int[frameStreams.Count];
+        var frames = new Bitmap[frameStreams.Count];
 
-    public void Init()
-    {
-        if (IsInitialized || IsFailed)
-            return;
         try
         {
-            if (_frameStreams is null)
-                throw new NullReferenceException(nameof(_frameStreams));
-            var delays = new int[_frameStreams.Count];
-            var frames = new Bitmap[_frameStreams.Count];
-            var index = 0;
-            while (_frameStreams.Count > 0)
+            for (var index = 0; index < frameStreams.Count; index++)
             {
-                delays[index] = _delays.ElementAtOrDefault(index) is var delay && delay > 0 ? delay : 100;
-                var frameStream = _frameStreams[0];
+                cancellationToken.ThrowIfCancellationRequested();
+
+                delays[index] = _sourceDelays.ElementAtOrDefault(index) is var delay && delay > 0 ? delay : 100;
+                var frameStream = frameStreams[index];
                 try
                 {
+                    if (frameStream is null)
+                        throw new InvalidOperationException($"{nameof(MultiAnimatedBitmap)} has an unavailable frame stream.");
+
                     frames[index] = new Bitmap(frameStream);
                 }
                 finally
                 {
                     if (disposeStream)
-                        frameStream.Dispose();
+                        frameStream?.Dispose();
+                    frameStreams[index] = null;
                 }
 
-                _frameStreams.RemoveAt(0);
-
-                ++index;
+                cancellationToken.ThrowIfCancellationRequested();
             }
-            _frameStreams = null;
 
-            Size = frames[0].Size;
-            FrameCount = delays.Length;
-            Delays = delays;
-            Frames = frames;
-            IsInitialized = true;
-            Initialized?.Invoke(this, EventArgs.Empty);
-        }
-        catch (Exception e)
-        {
-            if (_frameStreams is not null && disposeStream)
-                foreach (var frameStream in _frameStreams)
-                    frameStream.Dispose();
             _frameStreams = null;
-            IsFailed = true;
-            Failed?.Invoke(this, new AnimatedBitmapFailedEventArgs(e));
         }
+        catch
+        {
+            DisposeFrames(frames);
+            throw;
+        }
+
+        _size = frames[0].Size;
+        _frameCount = delays.Length;
+        _delays = delays;
+        _frames = frames;
+    }
+
+    protected override void DisposeCore()
+    {
+        if (_frameStreams is not null && disposeStream)
+            foreach (var frameStream in _frameStreams)
+                frameStream?.Dispose();
+        _frameStreams = null;
+
+        if (_frames is not null)
+            DisposeFrames(_frames);
+
+        _size = default;
+        _frameCount = 0;
+        _delays = [];
+        _frames = null;
+    }
+
+    private static void DisposeFrames(IEnumerable<Bitmap> frames)
+    {
+        foreach (var frame in frames)
+            frame?.Dispose();
     }
 }
