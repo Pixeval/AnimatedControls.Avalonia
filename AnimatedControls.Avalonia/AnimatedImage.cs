@@ -7,11 +7,12 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Metadata;
+using Avalonia.Rendering;
 using Avalonia.Rendering.Composition;
 
 namespace AnimatedControls.Avalonia;
 
-public class AnimatedImage : Control
+public class AnimatedImage : Control, ICustomHitTest
 {
     private CompositionCustomVisual? _customVisual;
     private CancellationTokenSource? _cancellationTokenSource;
@@ -55,6 +56,11 @@ public class AnimatedImage : Control
         AffectsMeasure<AnimatedImage>(SourceProperty, StretchProperty, StretchDirectionProperty);
         AffectsArrange<AnimatedImage>(SourceProperty, StretchProperty, StretchDirectionProperty);
     }
+
+    bool ICustomHitTest.HitTest(Point point) =>
+        point is { X: >= 0, Y: >= 0 }
+        && point.X <= Bounds.Width
+        && point.Y <= Bounds.Height;
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {

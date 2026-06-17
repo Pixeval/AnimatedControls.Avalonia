@@ -1,4 +1,4 @@
-﻿<Window
+<Window
     x:Class="AnimatedControls.Avalonia.Sample.MainWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -33,7 +33,13 @@
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"
             Stretch="{Binding SelectedItem, ElementName=StretchComboBox}"
-            StretchDirection="{Binding SelectedItem, ElementName=StretchDirectionComboBox}" />
+            StretchDirection="{Binding SelectedItem, ElementName=StretchDirectionComboBox}">
+            <ai:AnimatedImage.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Context Menu" />
+                </ContextMenu>
+            </ai:AnimatedImage.ContextMenu>
+        </ai:AnimatedImage>
     </DockPanel>
 
 </Window>
