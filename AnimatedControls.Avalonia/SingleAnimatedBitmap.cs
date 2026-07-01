@@ -35,9 +35,7 @@ internal class SingleAnimatedBitmap(Stream stream, bool disposeStream) : Animate
         if (_stream.CanSeek)
             _stream.Position = 0;
 
-        using var skCodec = SKCodec.Create(_stream);
-        if (skCodec is null)
-            throw new InvalidOperationException($"Unable to create {nameof(SKCodec)} from the provided stream.");
+        using var skCodec = SKCodec.Create(_stream) ?? throw new InvalidOperationException($"Unable to create {nameof(SKCodec)} from the provided stream.");
 
         var imageInfo = skCodec.Info;
         var targetInfo = new SKImageInfo(imageInfo.Width, imageInfo.Height, SKColorType.Bgra8888, SKAlphaType.Premul);

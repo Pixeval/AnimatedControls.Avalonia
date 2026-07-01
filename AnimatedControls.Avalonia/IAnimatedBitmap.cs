@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Avalonia;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 
 namespace AnimatedControls.Avalonia;
@@ -35,7 +37,7 @@ public interface IAnimatedBitmap : IDisposable
         => new SingleAnimatedBitmap(stream, disposeStream);
 
     static IAnimatedBitmap Load(IReadOnlyCollection<Stream> frameStreams, IReadOnlyCollection<int> delays, bool disposeStream)
-        => new MultiAnimatedBitmap(frameStreams, delays, disposeStream);
+        => new MultiAnimatedBitmap([.. frameStreams.Cast<BitmapOrStream>()], delays, disposeStream);
 
     /// <summary>
     /// 
@@ -45,4 +47,7 @@ public interface IAnimatedBitmap : IDisposable
     /// <returns></returns>
     static IAnimatedBitmap Load(IReadOnlyCollection<Bitmap> bitmaps, IReadOnlyCollection<int> delays)
         => new AnimatedBitmapSimpleImpl(bitmaps, delays);
+
+    static IAnimatedBitmap Load(IReadOnlyCollection<BitmapOrStream> bitmaps, IReadOnlyCollection<int> delays, bool disposeStream)
+        => new MultiAnimatedBitmap(bitmaps, delays, disposeStream);
 }

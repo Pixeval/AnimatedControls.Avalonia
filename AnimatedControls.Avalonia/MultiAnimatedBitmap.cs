@@ -8,12 +8,12 @@ using Avalonia.Media.Imaging;
 
 namespace AnimatedControls.Avalonia;
 
-internal class MultiAnimatedBitmap(IReadOnlyCollection<Stream> frameStreams, IReadOnlyCollection<int> delays, bool disposeStream) : AnimatedBitmapBase
+internal class MultiAnimatedBitmap(IReadOnlyCollection<BitmapOrStream> frameSources, IReadOnlyCollection<int> delays, bool disposeStream) : AnimatedBitmapBase
 {
-    private List<Stream?>? _frameStreams =
-        (frameStreams ?? throw new ArgumentNullException(nameof(frameStreams))).Count < 1
-            ? throw new ArgumentException($"Invalid {nameof(frameStreams)}.Count")
-            : [..frameStreams];
+    private List<BitmapOrStream?>? _frameSources =
+        (frameSources ?? throw new ArgumentNullException(nameof(frameSources))).Count < 1
+            ? throw new ArgumentException($"Invalid {nameof(frameSources)}.Count")
+            : [..frameSources];
 
     private readonly IReadOnlyCollection<int> _sourceDelays =
         delays is not null ? [..delays] : throw new ArgumentNullException(nameof(delays));
@@ -35,38 +35,40 @@ internal class MultiAnimatedBitmap(IReadOnlyCollection<Stream> frameStreams, IRe
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var frameStreams = _frameStreams
+        var frameSources = _frameSources
             ?? throw new InvalidOperationException($"{nameof(MultiAnimatedBitmap)} has no readable frame streams.");
 
-        var delays = new int[frameStreams.Count];
-        var frames = new Bitmap[frameStreams.Count];
+        var delays = new int[frameSources.Count];
+        var frames = new Bitmap[frameSources.Count];
 
         try
         {
-            for (var index = 0; index < frameStreams.Count; index++)
+            for (var index = 0; index < frameSources.Count; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 delays[index] = _sourceDelays.ElementAtOrDefault(index) is var delay && delay > 0 ? delay : 100;
-                var frameStream = frameStreams[index];
+                var frameSource = frameSources[index];
                 try
                 {
-                    if (frameStream is null)
-                        throw new InvalidOperationException($"{nameof(MultiAnimatedBitmap)} has an unavailable frame stream.");
-
-                    frames[index] = new Bitmap(frameStream);
+                    frames[index] = frameSource switch
+                    {
+                        Bitmap bitmap => bitmap,
+                        Stream stream => new Bitmap(stream),
+                        null => throw new InvalidOperationException($"{nameof(MultiAnimatedBitmap)} has an unavailable frame stream.")
+                    };
                 }
                 finally
                 {
-                    if (disposeStream)
-                        frameStream?.Dispose();
-                    frameStreams[index] = null;
+                    if (disposeStream && frameSource is Stream stream)
+                        stream.Dispose();
+                    frameSources[index] = null;
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            _frameStreams = null;
+            _frameSources = null;
         }
         catch
         {
@@ -82,10 +84,10 @@ internal class MultiAnimatedBitmap(IReadOnlyCollection<Stream> frameStreams, IRe
 
     protected override void DisposeCore()
     {
-        if (_frameStreams is not null && disposeStream)
-            foreach (var frameStream in _frameStreams)
+        if (_frameSources is not null && disposeStream)
+            foreach (var frameStream in _frameSources)
                 frameStream?.Dispose();
-        _frameStreams = null;
+        _frameSources = null;
 
         if (_frames is not null)
             DisposeFrames(_frames);
@@ -100,5 +102,23 @@ internal class MultiAnimatedBitmap(IReadOnlyCollection<Stream> frameStreams, IRe
     {
         foreach (var frame in frames)
             frame?.Dispose();
+    }
+}
+
+public union BitmapOrStream(Bitmap, Stream) : IDisposable
+{
+    public void Dispose()
+    {
+        switch(this)
+        {
+            case Bitmap bitmap:
+                bitmap.Dispose();
+                break;
+            case Stream stream:
+                stream.Dispose();
+                break;
+            default:
+                break;
+        }
     }
 }
