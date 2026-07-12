@@ -20,7 +20,7 @@ public interface IAnimatedBitmap : IDisposable
     /// Gets the size of the image, in device independent pixels.
     /// </summary>
     Size Size { get; }
-    
+
     int FrameCount { get; }
 
     IReadOnlyList<Bitmap> Frames { get; }
@@ -28,16 +28,16 @@ public interface IAnimatedBitmap : IDisposable
     IReadOnlyList<int> Delays { get; }
 
     void Init();
-    
+
     event EventHandler? Initialized;
-    
+
     event EventHandler<AnimatedBitmapFailedEventArgs>? Failed;
 
     static IAnimatedBitmap Load(Stream stream, bool disposeStream)
         => new SingleAnimatedBitmap(stream, disposeStream);
 
     static IAnimatedBitmap Load(IReadOnlyCollection<Stream> frameStreams, IReadOnlyCollection<int> delays, bool disposeStream)
-        => new MultiAnimatedBitmap([.. frameStreams.Cast<BitmapOrStream>()], delays, disposeStream);
+        => new MultiAnimatedBitmap([.. frameStreams.Select(static stream => (BitmapOrStream) stream)], delays, disposeStream);
 
     /// <summary>
     /// 
