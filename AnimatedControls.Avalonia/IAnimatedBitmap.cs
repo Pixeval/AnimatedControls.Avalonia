@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Avalonia;
-using Avalonia.Media;
 using Avalonia.Media.Imaging;
 
 namespace AnimatedControls.Avalonia;
