@@ -259,7 +259,7 @@ public class AnimatedImage : Control, ICustomHitTest
             {
                 _running = true;
                 _lastServerTime = null;
-                RegisterForNextAnimationFrameUpdate();
+                ScheduleAnimationFrameUpdate();
             }
             else if (message == StopMessage)
                 _running = false;
@@ -286,6 +286,9 @@ public class AnimatedImage : Control, ICustomHitTest
                             _totalTime += delay;
                         }
 
+                        // A single-frame bitmap is still represented by IAnimatedBitmap,
+                        // but it does not need a composition callback for every frame.
+                        ScheduleAnimationFrameUpdate();
                         Invalidate();
 
                         break;
@@ -306,7 +309,13 @@ public class AnimatedImage : Control, ICustomHitTest
             if (!_running)
                 return;
             Invalidate();
-            RegisterForNextAnimationFrameUpdate();
+            ScheduleAnimationFrameUpdate();
+        }
+
+        private void ScheduleAnimationFrameUpdate()
+        {
+            if (_running && _currentInstance is { FrameCount: > 1 })
+                RegisterForNextAnimationFrameUpdate();
         }
 
         public override void OnRender(ImmediateDrawingContext drawingContext)
