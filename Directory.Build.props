@@ -1,4 +1,10 @@
 <Project>
+	<PropertyGroup Condition="'$(EnableRuntimeAsync)' == 'false'">
+		<BaseIntermediateOutputPath>obj\compiler-async\</BaseIntermediateOutputPath>
+		<BaseOutputPath>bin\compiler-async\</BaseOutputPath>
+		<DefaultItemExcludes>$(DefaultItemExcludes);obj\**;bin\**</DefaultItemExcludes>
+	</PropertyGroup>
+
 	<PropertyGroup>
 		<AvaloniaVersion>12.1.3</AvaloniaVersion>
 	</PropertyGroup>
